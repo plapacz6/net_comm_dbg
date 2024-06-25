@@ -26,6 +26,8 @@ You should have received a copy of the GNU Lesser General Public License along
 // #include <cstdlib>
 #include <cstddef>
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
 
 // #include <unistd.h>
 #include <netinet/in.h>
@@ -40,10 +42,12 @@ class Ttest_server
     private:    
     int server_listen_fd;    
     int ret_server;
-    int ret;
+    // int ret;
     int opt; //for setsockopt    
     struct sockaddr_in server_address;
     socklen_t server_address_len;
+    int TIME_WAIT_curr_value;
+    const char *old_server_ip_address;
     
     struct pollfd fds[1];
 
@@ -51,6 +55,13 @@ class Ttest_server
 
     static std::atomic_bool server_run_flag;
     static std::atomic_bool connection_exist_flag;
+    static std::mutex mtx_run_srv;
+    static std::mutex mtx_listen_srv;
+    static std::mutex mtx_conn;
+    static std::mutex mtx_srv;
+    static std::condition_variable cv_conn_close;
+    static std::condition_variable cv_srv_close;
+    static std::condition_variable cv_srv_listen;
 
     Ttest_server();
     ~Ttest_server();
@@ -60,7 +71,7 @@ class Ttest_server
     public:
     int server_accepted_fd;
     const char *server_ip_address;
-    int server_port;
+    int server_ip_port;
     
     /*
     State indication not work well when 'run_test_server()' is in another thread than

@@ -24,6 +24,7 @@ You should have received a copy of the GNU Lesser General Public License along
 #include <cerrno>
 #include <cassert>
 #include <cstdint>
+#include <fstream>
 
 #include <unistd.h>
 #include <netinet/in.h>
@@ -32,6 +33,7 @@ You should have received a copy of the GNU Lesser General Public License along
 #include <sys/socket.h>
 
 #include <poll.h>
+#include <fcntl.h>
 
 using namespace std;
 
@@ -42,6 +44,13 @@ using namespace std;
 Ttest_server* Ttest_server::test_server_01_ptr {nullptr};
 atomic_bool Ttest_server::server_run_flag {false};
 atomic_bool Ttest_server::connection_exist_flag {false};
+mutex Ttest_server::mtx_run_srv;
+mutex Ttest_server::mtx_listen_srv;
+mutex Ttest_server::mtx_conn;
+mutex Ttest_server::mtx_srv;
+condition_variable Ttest_server::cv_srv_close;
+condition_variable Ttest_server::cv_conn_close;
+condition_variable Ttest_server::cv_srv_listen;
 
 
 Ttest_server::Ttest_server()
@@ -49,9 +58,35 @@ Ttest_server::Ttest_server()
     server_address_len {sizeof(server_address)},             
     server_accepted_fd {-1}    
 {
+    lock_guard<mutex> lg(mtx_run_srv);
     server_state = sv_state::SV_NOT_PREPARED;
     connection_state = conn_state::CONN_SV_NOT_READY;
-    define_test_server("127.0.0.1", 8080);
+    // define_test_server("127.0.0.1", 8080);
+    old_server_ip_address = nullptr;
+    server_listen_fd = -1;     
+
+    // ifstream proc_sys_net_ipv4_tcp_fin_timeout;
+    // proc_sys_net_ipv4_tcp_fin_timeout.open("/proc/sys/net/ipv4/tcp_fin_timeout", ios::in);
+    // proc_sys_net_ipv4_tcp_fin_timeout >> TIME_WAIT_curr_value;
+
+    int proc_sys_net_ipv4_tcp_fin_timeout_fd = open("/proc/sys/net/ipv4/tcp_fin_timeout", O_RDONLY);
+    if(proc_sys_net_ipv4_tcp_fin_timeout_fd < 0) {
+        ERROR_IN("open: proc_sys_net_ipv4_tcp_fin_timeout_fd");
+    }    
+    constexpr size_t time_wait_buff_size {256};
+    char time_wait_buff[time_wait_buff_size];
+    int readed = read(proc_sys_net_ipv4_tcp_fin_timeout_fd, time_wait_buff, time_wait_buff_size - 1);
+    if(readed < 0) {
+        ERROR_IN("read: proc_sys_net_ipv4_tcp_fin_timeout_fd");
+    }    
+    time_wait_buff[readed] = 0;
+    if(close(proc_sys_net_ipv4_tcp_fin_timeout_fd) < 0) {
+        ERROR_IN("close: proc_sys_net_ipv4_tcp_fin_timeout_fd");
+    }    
+    TIME_WAIT_curr_value = atoi(time_wait_buff);
+    if(TIME_WAIT_curr_value == 0) {
+        TIME_WAIT_curr_value = 60;
+    }
 }
 Ttest_server::~Ttest_server() {
     if(!test_server_01_ptr) {
@@ -71,12 +106,14 @@ Ttest_server& Ttest_server::create_test_server()
 }
 
 void Ttest_server::define_test_server(const char *ip_address, const int ip_port)
-{   
+{       
+    lock_guard<mutex> lg(mtx_run_srv);
+    int ret;
     if(server_run_flag) {
         stop_test_server();
     }
     server_ip_address = ip_address;
-    server_port = ip_port;
+    server_ip_port = ip_port;
     server_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(server_listen_fd < 0) {
         ERROR_IN("socket");            
@@ -90,17 +127,31 @@ void Ttest_server::define_test_server(const char *ip_address, const int ip_port)
     }
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = inet_addr(server_ip_address);
-    server_address.sin_port = htons(server_port);
-    ret = bind(server_listen_fd, (struct sockaddr*)&server_address, sizeof(struct sockaddr));
+    server_address.sin_port = htons(server_ip_port);
+
+    
+    if(old_server_ip_address == server_ip_address) {
+        fprintf(stdout, "\nserver: %s%d%s\n", "waiting ", TIME_WAIT_curr_value + 1, " sec for the socket's TIME_WAIT to pass");    
+        sleep(TIME_WAIT_curr_value + 1);
+    }
+
+    ret = bind(
+        server_listen_fd, 
+        (struct sockaddr*)&server_address, 
+        sizeof(struct sockaddr));
     if(ret < 0)
     {
+        fprintf(stderr, "server_listen_fd : %d\n", server_listen_fd);
         ERROR_IN("bind");            
     }
-    fprintf(stdout, "\nserver: %s\n", "test server defined");        
+    fprintf(stdout, "\nserver: %s\n", "test server defined");    
+    old_server_ip_address = server_ip_address;    
 }
 
 void Ttest_server::run_test_server() 
 {        
+    lock_guard<mutex> lg(mtx_run_srv);
+    int ret;
     // test_server_run_flag = true;    
     server_run_flag = true;
     fprintf(stdout, "\nserver: %s\n", "test server starting");
@@ -113,8 +164,13 @@ void Ttest_server::run_test_server()
     
     while(server_run_flag)
     {
-        fprintf(stdout, "\nserver: %s\n", "wait for connection ...");
+        fprintf(stdout, "\nserver: %s %s:%d ...\n", "wait for connection on", server_ip_address, server_ip_port);
         server_state = sv_state::SV_WAIT_FOR_CONNECTION;
+        
+        //TODO: 
+        // unique_lock<mutex> ul(mtx_listen_srv);
+        // cv_srv_listen.wait(ul);
+
         server_accepted_fd = accept(
             server_listen_fd, 
             (struct sockaddr*)& server_address, 
@@ -123,6 +179,7 @@ void Ttest_server::run_test_server()
             ERROR_IN("accept");               
         }
         connection_exist_flag = true;
+        
         server_state = sv_state::SV_CONNECTED; //client may not notice that, if run_test_server() is in separate thread
         fprintf(stdout, "\nserver: %s\n", "connection accepted");
         
@@ -155,38 +212,60 @@ void Ttest_server::run_test_server()
         {
             ERROR_IN("close: server_accepted_fd");
         }                  
+        do {
+            //waiting for closing fd and free ip addres/port
+            errno = 0;
+        } while(fcntl(server_accepted_fd, F_GETFD) != -1 || errno != EBADF);
         server_accepted_fd = -1;
+        
         fprintf(stdout, "\nserver: %s\n", "connection closed");
 
         fprintf(stdout, "\nserver: %s\n", "test server disconnected");
         server_state = sv_state::SV_DISCONNETED;
         
+        cv_conn_close.notify_one();
+
         if(!server_run_flag) {
             break;
         }
 
     } //while(server_run_flag)
+    if(shutdown(server_listen_fd, SHUT_RDWR) == -1) {
+        ERROR_IN("shutdown: server_ip_addres, SHUT_RDWR");
+    }    
     if(close(server_listen_fd) < 0){
         perror("test_server: close(server_listen_fd)");
         exit(1);
-    }
+    }   
     fprintf(stdout, "\nserver: %s\n", "test server stopped");
     fflush(stdout);
+    
+    do {
+        //waiting for closing fd and free ip addres/port
+        errno = 0;
+    }while(fcntl(server_listen_fd, F_GETFD) != -1 || errno != EBADF);
+    server_listen_fd = -1;
     server_state = sv_state::SV_STOPPED;
+
+    cv_srv_close.notify_one();
 }
 
 void Ttest_server::close_connection()
-{        
-    connection_exist_flag = false;                  
+{   
+    unique_lock<mutex> ul(mtx_conn);
+    connection_exist_flag = false;
+    cv_conn_close.wait(ul, [this]{ return server_accepted_fd == -1;});    
 }
 
 void Ttest_server::stop_test_server()
 {  
+    unique_lock<mutex> ul(mtx_srv);
     server_run_flag = false;  //must be first, because connection accepting loop start again
 
     if(connection_exist_flag) {
         close_connection();
     }            
+    cv_srv_close.wait(ul, [this]{ return server_listen_fd == -1;});
 }   
 
 bool Ttest_server::in_fd_are_set_only(short flags) {

@@ -28,6 +28,17 @@ You should have received a copy of the GNU Lesser General Public License along
 #include <arpa/inet.h>  //htons, inet_pton
 
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stddef.h>
+#include <unistd.h> //close
+
+#include <sys/socket.h>
+#include <netinet/in.h> //sockaddr_in
+#include <arpa/inet.h>  //htons, inet_pton
+
+
 int connect_to_server(char* server_address, int server_port)
 {
     // struct sockaddr sv_address; 
@@ -36,7 +47,7 @@ int connect_to_server(char* server_address, int server_port)
     
     sv_address.sin_family = AF_INET;
     // sv_address.sin_addr.s_addr = inet_addr(server_address);  //not recommended
-    if(inet_pton(AF_INET, server_address, &sv_address.sin_addr.s_addr) != 1){
+    if(inet_pton(AF_INET, server_address, &sv_address.sin_addr.s_addr) != 1) {
         perror("client: inet_pton()");
         return -1;
     }
@@ -57,7 +68,11 @@ int connect_to_server(char* server_address, int server_port)
 
 int disconnect_from_server(int socket_fd) 
 {
-    return -1;
+    if(close(socket_fd)) {
+        perror("client: close()");
+        return -1;
+    }
+    return 0;
 }
 
 int send_msg(int socket_fd, char *msg)

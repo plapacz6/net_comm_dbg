@@ -2,6 +2,12 @@ cmake_minimum_required(VERSION 3.19)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED)
+
+add_library(Ttest_server_for_one_connection STATIC Ttest_server_for_one_connection.cpp)
+target_compile_options(Ttest_server_for_one_connection PUBLIC -g3 -Wall -pthread)
+target_link_libraries(Ttest_server_for_one_connection PUBLIC pthread)
 
 list(APPEND lib_targets
     server_c

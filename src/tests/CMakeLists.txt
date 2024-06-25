@@ -7,10 +7,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED)
 
 find_package(GTest REQUIRED)
 
-add_library(Ttest_server_for_one_connection STATIC Ttest_server_for_one_connection.cpp)
-target_compile_options(Ttest_server_for_one_connection PUBLIC -g3 -Wall -pthread)
-target_link_libraries(Ttest_server_for_one_connection PUBLIC pthread)
-
 list(APPEND lib_target_tests
     test_server_c
     test_client_c
@@ -18,6 +14,7 @@ list(APPEND lib_target_tests
 
 foreach(lib_target_test lib_target IN ZIP_LISTS lib_target_tests lib_targets)
     add_executable("${lib_target_test}" "${lib_target_test}.cpp")
+    target_compile_definitions("${lib_target_test}" PUBLIC LDFLAGS="-stdlib=libstdc++")
     target_compile_options("${lib_target_test}" PUBLIC -g3 -Wall -pthread)
     target_link_libraries("${lib_target_test}" 
         pthread
@@ -28,4 +25,5 @@ foreach(lib_target_test lib_target IN ZIP_LISTS lib_target_tests lib_targets)
     )
     add_test("${lib_target_test}_runner" "${lib_target_test}")
 endforeach()
+
 
