@@ -1,0 +1,20 @@
+cmake_minimum_required(VERSION 3.19)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED)
+
+list(APPEND lib_targets
+    server_c
+    client_c
+)
+
+foreach(lib_target IN LISTS lib_targets)
+    add_library("${lib_target}" SHARED "${lib_target}.c")
+    target_compile_options("${lib_target}" PUBLIC -g3 -Wall -pthread)
+    target_include_directories("${lib_target}" PUBLIC .)
+    target_link_libraries("${lib_target}" 
+        pthread
+    )
+endforeach()
+
+add_subdirectory(tests)
