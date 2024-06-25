@@ -14,12 +14,13 @@ list(APPEND lib_target_tests
 
 foreach(lib_target_test lib_target IN ZIP_LISTS lib_target_tests lib_targets)
     add_executable("${lib_target_test}" "${lib_target_test}.cpp")
-    target_compile_definitions("${lib_target_test}" PUBLIC LDFLAGS="-stdlib=libstdc++")
-    target_compile_options("${lib_target_test}" PUBLIC -g3 -Wall -pthread)
+    # target_compile_definitions("${lib_target_test}" PUBLIC LDFLAGS="-stdlib=libstdc++")
+    target_compile_options("${lib_target_test}" PUBLIC ${FSTANITIZE_FLAG} -g3 -Wall -pthread) 
+    target_link_options("${lib_target_test}" PUBLIC ${FSTANITIZE_FLAG} -g3 -Wall -pthread)
     target_link_libraries("${lib_target_test}" 
         pthread
         GTest::GTest
-        GTest::gtest_main
+        # GTest::gtest_main
         "${lib_target}"
         Ttest_server_for_one_connection
     )

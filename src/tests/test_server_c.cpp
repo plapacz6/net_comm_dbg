@@ -26,3 +26,10 @@ TEST(net_comm_dbg_server_c, test_01)
 {
     ASSERT_EQ(1, 1);
 }
+
+int main(int argc, char** argv)
+{
+    InitGoogleTest(&argc, argv);
+
+    return RUN_ALL_TESTS();
+}

@@ -39,34 +39,42 @@ You should have received a copy of the GNU Lesser General Public License along
 using namespace std;
 using namespace testing;
 
-#include "Ttest_server_for_one_connection.h"
+#include "../Ttest_server_for_one_connection.h"
 
 
 Ttest_server& test_server = Ttest_server::create_test_server();
 
 class client_c_fixture_01 : public Test
 {
+    protected:
+        
+    // static void SetUpTestCase()
+    // {
+    // }
+    // static void TearDownTestCase() 
+    // {
+    // }
     void SetUp() override
     {       
-        test_server.define_test_server("127.0.0.1", 8080);
-        thread server_thread = thread(&Ttest_server::run_test_server, &test_server);
-        server_thread.detach();        
-        sleep(1);
+        sleep(3);
     }    
     void TearDown() override
-    {   
-        test_server.stop_test_server();
-        fflush(stdout);
-        assert(test_server.server_state == Ttest_server::sv_state::SV_STOPPED);        
+{           
+        test_server.stop_accepting_connections();        
+        test_server.stop_monitoring_connection();        
+        cout << "fixture tear down end" << endl;
     }
 };
 
 TEST_F(client_c_fixture_01, connect_01) 
-{   
+{           
+    test_server.start_accepting_connections();
+      
     // ASSERT_EQ(Ttest_server::sv_state::SV_WAIT_FOR_CONNECTION, test_server.server_state); 
     int client_fd = connect_to_server(
         const_cast<char*>(test_server.server_ip_address), test_server.server_ip_port);
-    sleep(1);
+    test_server.start_monitoring_connection();            
+    // sleep(1);
     // ASSERT_EQ(Ttest_server::sv_state::SV_CONNECTED, test_server.server_state);
     sleep(1);
     ASSERT_NE(client_fd, -1);  //error
@@ -78,25 +86,30 @@ TEST_F(client_c_fixture_01, connect_01)
     sleep(1);
     // ASSERT_EQ(Ttest_server::conn_state::CONN_RDHUP_AND_WR_RD, test_server.connection_state);
     // ASSERT_EQ(Ttest_server::sv_state::SV_CONNECTED, test_server.server_state);
-    test_server.close_connection();
+    test_server.close_monitored_connection();
     sleep(1);
+    test_server.stop_monitoring_connection(); 
+    
     client_fd = connect_to_server(
         const_cast<char*>(test_server.server_ip_address), test_server.server_ip_port);                
-    sleep(1);
+    test_server.start_monitoring_connection();         
     ASSERT_NE(client_fd, -1);  //error
     ASSERT_NE(client_fd, 0);  //stdin
     ASSERT_NE(client_fd, 1);  //stdout
     ASSERT_NE(client_fd, 2);  //stderr    
-
-    test_server.stop_test_server();
+    // test_server.stop_accepting_connections();
+    // test_server.stop_monitoring_connection();     
     // ASSERT_EQ(Ttest_server::sv_state::SV_WAIT_FOR_CONNECTION, test_server.server_state); 
 }
 
 
 TEST_F(client_c_fixture_01, disconnect_01) 
 {
+    test_server.start_accepting_connections();
+    
     int client_fd = connect_to_server(
         const_cast<char*>(test_server.server_ip_address), test_server.server_ip_port);    
+    test_server.start_monitoring_connection();         
     sleep(1);
     int ret = disconnect_from_server(client_fd);
     ASSERT_EQ(0, ret);
@@ -109,4 +122,22 @@ TEST_F(client_c_fixture_01, disconnect_01)
     int err = errno;
     ASSERT_EQ(-1, ret);
     ASSERT_EQ(EBADF, err);  // EDESTADDRREQ ???
+    cout << "test_2_end" << endl;
+}
+
+int main_result = 0;
+int main(int argc, char** argv)
+{
+    InitGoogleTest(&argc, argv);
+
+    test_server.define_test_server("127.0.0.1", 8080);
+    thread server_thread = thread(&Ttest_server::test_server_connection_loop, &test_server);
+    // server_thread.detach();  //! <- thread worker use object body, so object must exist    
+    test_server.start_test_server();
+
+    main_result = RUN_ALL_TESTS(); //<- warning: ThreadStnitizer : main_result
+
+    test_server.stop_test_server(); // <- run loop must be breaken before thread.join()
+    server_thread.join();            
+    return main_result;
 }
