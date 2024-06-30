@@ -23,8 +23,8 @@ public:
 		* check if state is equal : 0 - false/off, 1 - true/on, 2 - any
 		*/
 		bool eq(int d, int r, int a, int c, int de, int re, int ae, int ce) const;
-		char* sprintf_state(char *sprintf_buff);
-		friend ostream& operator<<(ostream& out, Tstate& st);
+		const char* sprintf_state(char *sprinf_buff, size_t buff_size);
+		friend std::ostream& operator<<(std::ostream& out, Tstate& st);
 		
 	} current, demand;
 
@@ -35,11 +35,11 @@ public:
 	} opt;
 
 	bool reached() const;
-	friend ostream& operator<<(ostream& out, TSvSt& st);
+	friend std::ostream& operator<<(std::ostream& out, TSvSt& st);
 };
 
-ostream& operator<<(ostream& out, Tstate& st);
+std::ostream& operator<<(std::ostream& out, TSvSt::Tstate& st);
 
 
-ostream& operator<<(ostream& out, TSvSt& st);
+std::ostream& operator<<(std::ostream& out, TSvSt& st);
 #endif // TSVST_H
