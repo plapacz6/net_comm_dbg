@@ -55,63 +55,63 @@ class client_c_fixture_01 : public Test
     // {
     // }
     void SetUp() override
-    {       
-        sleep(3);
+    {   
+        cout << "fixture SetUp()" << endl;    
+        // sleep(3);        
+        cout << "fixture SetUp() end" << endl;    
     }    
     void TearDown() override
-{           
-        test_server.stop_accepting_connections();        
-        test_server.stop_monitoring_connection();        
-        cout << "fixture tear down end" << endl;
+{       cout << "fixture TearDown()" << endl;    
+
+        // test_server.close_monitored_connection();    
+        // test_server.stop_accepting_connections();                
+ 
+        cout << "fixture TearDown() end" << endl;
     }
 };
 
 TEST_F(client_c_fixture_01, connect_01) 
 {           
-    test_server.start_accepting_connections();
-      
-    // ASSERT_EQ(Ttest_server::sv_state::SV_WAIT_FOR_CONNECTION, test_server.server_state); 
+    test_server.start_accepting_connections(2);
+    sleep(3);
     int client_fd = connect_to_server(
         const_cast<char*>(test_server.server_ip_address), test_server.server_ip_port);
-    test_server.start_monitoring_connection();            
-    // sleep(1);
-    // ASSERT_EQ(Ttest_server::sv_state::SV_CONNECTED, test_server.server_state);
-    sleep(1);
+
+    sleep(3);
     ASSERT_NE(client_fd, -1);  //error
     ASSERT_NE(client_fd, 0);  //stdin
     ASSERT_NE(client_fd, 1);  //stdout
     ASSERT_NE(client_fd, 2);  //stderr    
-    // ASSERT_EQ(Ttest_server::conn_state::CONN_POSSIBLE_WR_RD, test_server.connection_state);
+
     close(client_fd);
-    sleep(1);
-    // ASSERT_EQ(Ttest_server::conn_state::CONN_RDHUP_AND_WR_RD, test_server.connection_state);
-    // ASSERT_EQ(Ttest_server::sv_state::SV_CONNECTED, test_server.server_state);
+    sleep(3);
+
     test_server.close_monitored_connection();
-    sleep(1);
-    test_server.stop_monitoring_connection(); 
+    sleep(3);    
     
     client_fd = connect_to_server(
         const_cast<char*>(test_server.server_ip_address), test_server.server_ip_port);                
-    test_server.start_monitoring_connection();         
+    sleep(3);           
     ASSERT_NE(client_fd, -1);  //error
     ASSERT_NE(client_fd, 0);  //stdin
     ASSERT_NE(client_fd, 1);  //stdout
     ASSERT_NE(client_fd, 2);  //stderr    
-    // test_server.stop_accepting_connections();
-    // test_server.stop_monitoring_connection();     
-    // ASSERT_EQ(Ttest_server::sv_state::SV_WAIT_FOR_CONNECTION, test_server.server_state); 
+
+    // test_server.stop_accepting_connections();                
+    sleep(3);    
 }
 
 
 TEST_F(client_c_fixture_01, disconnect_01) 
 {
-    test_server.start_accepting_connections();
-    
+    test_server.start_accepting_connections(1);
+    sleep(3);        
     int client_fd = connect_to_server(
         const_cast<char*>(test_server.server_ip_address), test_server.server_ip_port);    
-    test_server.start_monitoring_connection();         
-    sleep(1);
+            
+    sleep(3);
     int ret = disconnect_from_server(client_fd);
+    sleep(3);        
     ASSERT_EQ(0, ret);
     enum {buff_size = 256};
     char buff[buff_size];
@@ -123,21 +123,29 @@ TEST_F(client_c_fixture_01, disconnect_01)
     ASSERT_EQ(-1, ret);
     ASSERT_EQ(EBADF, err);  // EDESTADDRREQ ???
     cout << "test_2_end" << endl;
+    sleep(3);    
 }
 
-int main_result = 0;
+extern FILE * server_log;
+
 int main(int argc, char** argv)
 {
+    int main_result;
     InitGoogleTest(&argc, argv);
 
-    test_server.define_test_server("127.0.0.1", 8080);
+    server_log = server_log = fdopen(1, "w"); //stdout;
+    
     thread server_thread = thread(&Ttest_server::test_server_connection_loop, &test_server);
     // server_thread.detach();  //! <- thread worker use object body, so object must exist    
+
+    test_server.define_test_server("127.0.0.1", 8080);
     test_server.start_test_server();
 
-    main_result = RUN_ALL_TESTS(); //<- warning: ThreadStnitizer : main_result
-
-    test_server.stop_test_server(); // <- run loop must be breaken before thread.join()
+    main_result = RUN_ALL_TESTS(); //<- warning: ThreadStnitizer : main_result    
+    
     server_thread.join();            
+
+    test_server.destroy_socket(); // <- run loop must be broken before thread.join()
+    
     return main_result;
 }

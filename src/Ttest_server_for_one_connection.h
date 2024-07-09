@@ -37,50 +37,55 @@ You should have received a copy of the GNU Lesser General Public License along
 
 #include <poll.h>
 
+#include "TSvSt.h"
+
 class server_state;
 
 class Ttest_server
 {    
     private:    
     int server_listen_fd;    
-    int ret_server;
-    // int ret;
+
     int opt; //for setsockopt    
     struct sockaddr_in server_address;
     socklen_t server_address_len;
     int TIME_WAIT_curr_value;
     const char *old_server_ip_address;
     
-    struct pollfd fds[1];
-
     static Ttest_server* test_server_01_ptr;
     size_t listen_loop_number;
 
-    static std::atomic_bool STATE_sv_defined;
-    static std::atomic_bool STATE_sv_def_enable;
-    static std::atomic_bool STATE_sv_runs;
-    static std::atomic_bool STATE_sv_start_demand;
-    static std::atomic_bool STATE_sv_stopped;
-    static std::atomic_bool STATE_sv_stop_demand;
-    
-    static std::atomic_bool STATE_server_monitors_connection_state;
-    static std::atomic_bool STATE_monitoring_connection_state_enabled;
 
-    static std::atomic_bool STATE_accepting;
-    static std::atomic_bool STATE_accepting_enabled;
     
-    
+    static std::mutex mtx_srv_state;
+
     static std::mutex mtx_srv_run;
-    // static std::mutex mtx_srv_def;
+    static std::mutex mtx_srv_def;
     static std::mutex mtx_srv_accept;
+
+    static std::mutex mtx_cmd_run;
+    static std::mutex mtx_cmd_acc;
+    static std::mutex mtx_cmd_Nrun;
+    static std::mutex mtx_cmd_Nacc;
+    static std::mutex mtx_cmd_Ncon;
+
     // static std::mutex mtx_conn_close;
-    static std::mutex mtx_conn_monitoring;
+    // static std::mutex mtx_conn_monitoring;
     
     // static std::condition_variable cv_conn_close;
-    static std::condition_variable cv_conn_monitoring_enable;
+    // static std::condition_variable cv_conn_monitoring_enable;
+
+    //for server main loop
     static std::condition_variable cv_srv_accept_enable;
-    static std::condition_variable cv_srv_run_enable;
-    // static std::condition_variable cv_srv_def;
+    static std::condition_variable cv_srv_run_enable;    
+    static std::condition_variable cv_srv_def;
+
+    //for commands
+    static std::condition_variable cv_st_run;
+    static std::condition_variable cv_st_acc;
+    static std::condition_variable cv_st_Nrun;
+    static std::condition_variable cv_st_Nacc;    
+    static std::condition_variable cv_st_Ncon;
 
     /**
      * @brief Construct a new Ttest_server object
@@ -95,32 +100,40 @@ class Ttest_server
     ~Ttest_server();
     Ttest_server(Ttest_server&) = delete;
     Ttest_server operator=(Ttest_server&) = delete;   
-    void wait_for_state_neq(std::atomic_bool* state, bool yes);     
+    void wait_for_state_neq(int d, int r, int a, int c);     
+    
+    /**
+     * @brief server start listening
+     * 
+     */
+    void listen_fd_run();
+
+    /**
+     * @brief close file descriptor of current accepted connection
+     * 
+     * @return * close 
+     */
+    void close_accepted_fd();
+    /**
+     * @brief accept connection
+     * 
+     */
+    void accepted_fd_connect();
+
+    struct pollfd fds[1];
+    int old_revents;           
+    void monitor_connection_init();
+    void monitor_connection();
+    bool monitor_connection_no_change();
+    bool check_if_clientd_disconnects();
+    void print_connection_state();
 
     public:
+    TSvSt st;  //server state
     int server_accepted_fd;
     const char *server_ip_address;
     int server_ip_port;
     
-    /*
-    State indication not work well when 'run_test_server()' is in another thread than
-    client, because client can write/read immedietly after accept, but server/connection state
-    is changed in next line of code.
-    */
-    enum class sv_state {
-        SV_NOT_PREPARED,
-        SV_WAIT_FOR_CONNECTION,
-        SV_CONNECTED,
-        SV_DISCONNETED,
-        SV_STOPPED
-    };
-    enum class conn_state {
-        CONN_SV_NOT_READY,
-        CONN_UNKNOWN
-    };
-    sv_state server_state;
-    conn_state connection_state;
-
     static Ttest_server& create_test_server();
 
     /**
@@ -130,6 +143,12 @@ class Ttest_server
      * @param ip_port 
      */
     void define_test_server(const char *ip_address, const int ip_port);
+
+    /**
+     * @brief close server socket
+     * 
+     */
+    void destroy_socket();
 
     /**
      * @brief start listening on binded socket and start loop of accepting connections
@@ -181,31 +200,12 @@ class Ttest_server
     
 };
 
-
-class server_state {
-    public:
-    enum {
-        STATE_sv_defined,
-        STATE_sv_def_enable,
-        STATE_sv_runs,
-        STATE_sv_start_demand,
-        STATE_sv_stopped,
-        STATE_sv_stop_demand,
-        STATE_server_monitors_connection_state,
-        STATE_monitoring_connection_state_enabled,
-        STATE_accepting,
-        STATE_accepting_enabled,
-        STATE_COUNT
-    };
-    static std::atomic_int current_state;
-    static std::atomic_int demand_state;
-
-    bool reached() {
-        // lock_guard<mutex> lg_c(mtx_sv_curr_state, defer_lock);
-        // lock_guard<mutex> lg_d(mtx_sv_demand_state, defer_lock);
-        // lock(lg_c, lg_d);
-        return current_state == demand_state;
-    }
-};
-
+extern FILE *server_log;
+/**
+ * @brief print information in fomat "\nsource : message\n"
+ * 
+ * @param source 's' == "server", 'c' == "connection"
+ * @param msg message
+ */
+void printmsg(const char source, const char *msg);
 #endif //TTEST_SERVER_FOR_ONE_CONNECTION_H

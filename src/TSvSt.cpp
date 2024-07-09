@@ -22,30 +22,25 @@ You should have received a copy of the GNU Lesser General Public License along
 
 using namespace std;
 
-void TSvSt::Tstate::set(int d, int r, int a, int c, int de, int re, int ae, int ce) {
+mutex TSvSt::mtx_curr;
+mutex TSvSt::mtx_dem;
+
+void TSvSt::Tstate::set(int d, int r, int a, int c) {
 #define SETSTATE(X, V)  if(V == 2) {X = X;} else {X = V;};
 	SETSTATE(def, d);
 	SETSTATE(run, r);
 	SETSTATE(acc, a);
 	SETSTATE(con, c);
-	SETSTATE(defe, de);
-	SETSTATE(rune, re);
-	SETSTATE(acce, ae);
-	SETSTATE(cone, ce);
 #undef SETSTATE 
 }
 
-bool TSvSt::Tstate::eq(int d, int r, int a, int c, int de, int re, int ae, int ce) const {
-#define CHECKSTATE(X, V) ((V == 2) ? X : X == V)
+bool TSvSt::Tstate::eq(int d, int r, int a, int c) const {
+#define CHECKSTATE(X, V) ((V == 2) ? true : X == V)
 	return (
 		CHECKSTATE(def, d) &&
 		CHECKSTATE(run, r) &&
 		CHECKSTATE(acc, a) &&
-		CHECKSTATE(con, c) &&
-		CHECKSTATE(defe, de) &&
-		CHECKSTATE(rune, re) &&
-		CHECKSTATE(acce, ae) &&
-		CHECKSTATE(cone, ce)
+		CHECKSTATE(con, c)
 		);
 #undef CHECKSTATE
 }
@@ -63,10 +58,6 @@ const char* TSvSt::Tstate::sprintf_state(char *sprinf_buff, size_t buff_size) {
 	SPRINTFSTATE(run);
 	SPRINTFSTATE(acc);
 	SPRINTFSTATE(con);
-	SPRINTFSTATE(defe);
-	SPRINTFSTATE(rune);
-	SPRINTFSTATE(acce);
-	SPRINTFSTATE(cone);
 	return sprinf_buff;
 #undef SPRINTFSTATE
 }
@@ -77,10 +68,6 @@ ostream& operator<<(ostream& out, TSvSt::Tstate& st) {
 	PRINTST(run);
 	PRINTST(acc);
 	PRINTST(con);
-	PRINTST(defe);
-	PRINTST(rune);
-	PRINTST(acce);
-	PRINTST(cone);
 #undef PRINTST
 	return out;
 }
@@ -91,11 +78,7 @@ bool TSvSt::reached() const {
 		STEQ(def) &&
 		STEQ(run) &&
 		STEQ(acc) &&
-		STEQ(con) &&
-		STEQ(defe) &&
-		STEQ(rune) &&
-		STEQ(acce) &&
-		STEQ(cone)
+		STEQ(con)
 		) {
 		return true;
 	}

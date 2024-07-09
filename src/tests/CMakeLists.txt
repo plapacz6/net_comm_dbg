@@ -10,6 +10,7 @@ find_package(GTest REQUIRED)
 list(APPEND lib_target_tests
     test_server_c
     test_client_c
+    test_Ttest_server_for_one_connection
 )
 
 foreach(lib_target_test lib_target IN ZIP_LISTS lib_target_tests lib_targets)
@@ -23,6 +24,8 @@ foreach(lib_target_test lib_target IN ZIP_LISTS lib_target_tests lib_targets)
         # GTest::gtest_main
         "${lib_target}"
         Ttest_server_for_one_connection
+        helper
+        TSvSt
     )
     add_test("${lib_target_test}_runner" "${lib_target_test}")
 endforeach()

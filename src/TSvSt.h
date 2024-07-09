@@ -19,6 +19,7 @@ You should have received a copy of the GNU Lesser General Public License along
 #ifndef TSVST_H
 #define TSVST_H
 #include <iostream>
+#include <mutex>
 
 class TSvSt {
 public:
@@ -28,23 +29,20 @@ public:
 		int acc;
 		int con;
 
-		int defe;  //def enable
-		int rune;
-		int acce;
-		int cone;  //cone == 1 if con == 0
-
 		/**
-		* set state: 0 - false/off, 1 - true/on, 2 - don't change
+		* set state: 0 - false/off, 1 - true/on, 2 - don't change, 3 - not set
 		*/
-		void set(int d, int r, int a, int c, int de, int re, int ae, int ce);
+		void set(int d, int r, int a, int c);
 		/**
-		* check if state is equal : 0 - false/off, 1 - true/on, 2 - any
+		* check if state is equal : 0 - false/off, 1 - true/on, 2 - any, 3 - not set
 		*/
-		bool eq(int d, int r, int a, int c, int de, int re, int ae, int ce) const;
+		bool eq(int d, int r, int a, int c) const;
 		const char* sprintf_state(char *sprinf_buff, size_t buff_size);
 		friend std::ostream& operator<<(std::ostream& out, Tstate& st);
 		
 	} current, demand;
+	static std::mutex mtx_curr;
+	static std::mutex mtx_dem;
 
 	struct Toptions {
 		int show_POLL_monitor;
