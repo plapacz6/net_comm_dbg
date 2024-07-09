@@ -532,7 +532,7 @@ void Ttest_server::test_server_connection_loop()
                 
                 /* monitoring connetion state */    
                 
-                fprintf(server_log, "\nserver: %s\n", "connection monitoring start");                    
+                printmsg('s', "connection monitoring start");                    
                 while(1){ //while CONN
 
                     fprintf(server_log, "%c", '.');
@@ -558,14 +558,14 @@ void Ttest_server::test_server_connection_loop()
 
                 } //while CONN
                 
-                fprintf(server_log, "\nserver: %s\n", "connection monitoring loop broken");                    
+                printmsg('s', "connection monitoring loop broken");                    
 
                 close_accepted_fd();
                                 
                 SET_CURR_ST(2, 2, 2, 0); //set: !con                                                  
                 cv_st_Ncon.notify_one();      
 
-                fprintf(server_log, "\nserver: %s\n", "connection monitoring stopped");
+                printmsg('s', "connection monitoring stopped");
                 
 
 
@@ -574,28 +574,27 @@ void Ttest_server::test_server_connection_loop()
 
 
             } //for(listen_loop_counter)
-            fprintf(server_log, "\nserver: %s\n", "accepting connection loop broken");            
+            printmsg('s', "accepting connection loop broken");            
             
             SET_CURR_ST(2, 2, 0, 2); //set: !acc                                            
             cv_st_Nacc.notify_one();
 
-            fprintf(server_log, "\nserver: %s\n", "accepting connection stopped");   
+            printmsg('s', "accepting connection stopped");   
 
             if(d_st_11) {  //demand : !run
                 break;  
             }
             
         } //while LISTEN
-        fprintf(server_log, "\nserver: %s\n", "listening finished");
-        fflush(server_log);    
+        printmsg('s', "listening finished");
+        
 
     }//if !run
 
     SET_CURR_ST(0, 0, 2, 2); //set: !def, !run               
     cv_st_Nrun.notify_one();     
 
-    fprintf(server_log, "\nserver: %s\n", "ready to close socket");
-    fflush(server_log);    
+    printmsg('s', "ready to close socket");    
 
     // destroy_socket();
     return;
